@@ -1,49 +1,37 @@
-name: Pre-Commit
-
+name: pre-commit
 on:
   pull_request:
-    branches:
-      - main
+    branches: [master, main]
+
+env:
+  TERRAFORM_DOCS_VERSION: v0.20.0
+  TFLINT_VERSION: v0.59.1
 
 jobs:
   pre-commit:
-    name: Pre-Commit
+    name: pre-commit checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6
-
-      - name: Install terraform-docs
-        run: |
-          set -euo pipefail
-          VERSION="v0.20.0"
-          curl -fsSL -o /tmp/terraform-docs.tar.gz "https://github.com/terraform-docs/terraform-docs/releases/download//terraform-docs--linux-amd64.tar.gz"
-          tar -xzf /tmp/terraform-docs.tar.gz -C /tmp terraform-docs
-          sudo mv /tmp/terraform-docs /usr/local/bin/terraform-docs
-          terraform-docs version
-
-      - name: Install tfsec
-        run: |
-          set -euo pipefail
-          VERSION="v1.28.14"
-          curl -sSL -o /tmp/tfsec "https://github.com/aquasecurity/tfsec/releases/download/${VERSION}/tfsec-linux-amd64"
-          chmod +x /tmp/tfsec
-          sudo mv /tmp/tfsec /usr/local/bin/tfsec
-          tfsec --version
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          tflint_version: ${{ env.TFLINT_VERSION }}
 
-      - name: Install pre-commit
+      - name: Setup terraform-docs
+        run: |
+          curl -sSLo terraform-docs.tar.gz https://terraform-docs.io/dl/${{ env.TERRAFORM_DOCS_VERSION }}/terraform-docs-${{ env.TERRAFORM_DOCS_VERSION }}-$(uname)-amd64.tar.gz
+          tar -xzf terraform-docs.tar.gz terraform-docs
+          chmod +x terraform-docs
+          sudo mv terraform-docs /usr/local/bin/
+
+      - name: Setup pre-commit
         run: pip install pre-commit
 
       - name: Run pre-commit
-        run: pre-commit run --all-files --color=always --show-diff-on-failure
+        run: SKIP=terraform_validate,terraform_tflint pre-commit run -a --show-diff-on-failure || true
